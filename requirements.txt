@@ -1,0 +1,12 @@
+datasets
+transformers
+textstat
+pandas
+tqdm
+ipykernel
+huggingface_hub
+torch
+sentencepiece
+protobuf
+errant
+spacy
