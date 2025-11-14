@@ -8,6 +8,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
+#SBATCH --account=pr_XXX  # Replace pr_XXX with your actual project ID
 
 # Mail alerts when the job ends
 #SBATCH --mail-type=END
@@ -24,8 +25,8 @@ conda activate /vast/YOUR_NETID/conda_envs/slm_env
 # Change to your working directory on scratch
 cd /scratch/YOUR_NETID/SLM_system
 
-# Create logs directory if it doesn't exist
-mkdir -p logs
+# Create logs and results directories if they don't exist
+mkdir -p logs results
 
 # Train GPT-2 on BEA dataset for grammatical error correction
 python scripts/python/gpt-2-grammar/train_gpt2.py \

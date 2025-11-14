@@ -5,6 +5,8 @@ Usage: python train_gpt2.py --model_size gpt2 --output_dir ./models/gpt2_bea
 
 import argparse
 import os
+import json
+import time
 import pandas as pd
 import torch
 from transformers import (
@@ -132,14 +134,45 @@ def main():
     
     # Train
     print("Starting training...")
-    trainer.train()
+    start_time = time.time()
+    train_result = trainer.train()
+    end_time = time.time()
+    training_duration = end_time - start_time
     
     # Save final model
     print(f"Saving final model to {args.output_dir}/final_model")
     trainer.save_model(f"{args.output_dir}/final_model")
     tokenizer.save_pretrained(f"{args.output_dir}/final_model")
     
-    print("Training completed!")
+    # Save training metadata (time, cost info)
+    training_metadata = {
+        "training_duration_seconds": training_duration,
+        "training_duration_hours": training_duration / 3600,
+        "training_duration_formatted": f"{int(training_duration // 3600)}h {int((training_duration % 3600) // 60)}m {int(training_duration % 60)}s",
+        "model_size": args.model_size,
+        "epochs": args.epochs,
+        "batch_size": args.batch_size,
+        "num_examples": len(train_dataset),
+        "total_steps": train_result.global_step,
+        "final_loss": train_result.training_loss if hasattr(train_result, 'training_loss') else None,
+        "gpu_used": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU",
+        "gpu_memory_allocated_gb": torch.cuda.max_memory_allocated(0) / 1e9 if torch.cuda.is_available() else 0,
+    }
+    
+    metadata_path = os.path.join(args.output_dir, "training_metadata.json")
+    with open(metadata_path, 'w') as f:
+        json.dump(training_metadata, f, indent=2)
+    
+    print("\n" + "="*70)
+    print("TRAINING COMPLETED")
+    print("="*70)
+    print(f"Duration: {training_metadata['training_duration_formatted']}")
+    print(f"Total steps: {training_metadata['total_steps']}")
+    print(f"GPU: {training_metadata['gpu_used']}")
+    if training_metadata['gpu_memory_allocated_gb'] > 0:
+        print(f"Max GPU memory: {training_metadata['gpu_memory_allocated_gb']:.2f} GB")
+    print(f"Metadata saved to: {metadata_path}")
+    print("="*70)
 
 
 if __name__ == "__main__":
