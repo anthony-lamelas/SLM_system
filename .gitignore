@@ -18,3 +18,27 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# Datasets
+hpc_datasets/
+data/
+*.csv
+*.m2
+*.json
+
+# Model outputs
+models/
+checkpoints/
+*.pt
+*.bin
+*.safetensors
+
+# Results and logs
+results/
+logs/
+*.out
+*.err
+
+# TensorBoard
+runs/
+events.out.tfevents.*

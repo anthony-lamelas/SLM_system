@@ -1,7 +1,15 @@
-# Environment Setup
-1. python -m venv venv
-2. ./venv/Scripts/activate   (if venv not already activated)
-3. pip install -r requirements.txt   (if not already installed)
+# SLM System - Grammar & Readability Evaluation
+
+Comparing GPT-4/GPT-5 to fine-tuned Small Language Models on grammar correction and text simplification.
+
+## Quick Start
+
+**For NYU Greene HPC**: See [SETUP.md](SETUP.md) for deployment instructions.
+
+**For Local Development**:
+1. `python -m venv venv`
+2. `./venv/Scripts/activate`
+3. `pip install -r requirements.txt`
 
 
 # How to Access Datasets:
