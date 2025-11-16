@@ -26,7 +26,6 @@ hpc_datasets/
 data/
 *.csv
 *.m2
-*.json
 
 # Model outputs
 models/
