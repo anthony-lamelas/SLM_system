@@ -35,7 +35,9 @@ checkpoints/
 *.safetensors
 
 # Results and logs
-results/
+results/*.csv
+results/*.out
+results/*.err
 logs/
 *.out
 *.err
