@@ -8,7 +8,6 @@ from nltk.translate.gleu_score import sentence_gleu
 from client import get_openai_client, generate_completion
 from prompts import grammar_sys_prompt, grammar_gen_prompt
 
-
 def evaluate_grammar(
     model_name,
     test_data_path,
@@ -98,10 +97,19 @@ def calculate_m2_score(sources, predictions, references, results_df):
         print("Calculating M^2 scores with ERRANT (optimized with batching)...")
         
         # OPTIMIZATION: Batch process with spaCy's pipe for 3-5x speedup
-        # Prepare all texts for batch processing
-        all_sources = list(sources)
-        all_predictions = list(predictions)
-        all_references = list(references)
+        # Prepare all texts for batch processing and filter out invalid entries
+        all_sources = []
+        all_predictions = []
+        all_references = []
+        
+        for src, pred, ref in zip(sources, predictions, references):
+            # Skip entries with NaN or non-string values
+            if isinstance(src, str) and isinstance(pred, str) and isinstance(ref, str):
+                all_sources.append(src)
+                all_predictions.append(pred)
+                all_references.append(ref)
+        
+        print(f"  Processing {len(all_sources)} valid examples (skipped {len(list(sources)) - len(all_sources)} invalid entries)")
         
         # Parse all texts in batches (much faster than one-by-one)
         print("  Parsing sources...")
