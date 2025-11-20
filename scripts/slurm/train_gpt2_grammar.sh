@@ -3,12 +3,10 @@
 #SBATCH --output=logs/gpt2_grammar_%j.out
 #SBATCH --error=logs/gpt2_grammar_%j.err
 #SBATCH --time=24:00:00
-#SBATCH --partition=a100_1,a100_2,v100
 #SBATCH --gres=gpu:1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --account=pr_XXX  # Replace pr_XXX with your actual project ID
 
 # Mail alerts when the job ends
 #SBATCH --mail-type=END
@@ -18,9 +16,9 @@
 module load anaconda3/2024.02
 module load cuda/11.3.1
 
-# Activate your conda environment (update path to your environment)
+# Activate your conda environment
 source ~/.bashrc
-conda activate /vast/YOUR_NETID/conda_envs/slm_env
+conda activate slm_env
 
 # Change to your working directory on scratch
 cd /scratch/YOUR_NETID/SLM_system

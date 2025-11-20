@@ -52,24 +52,8 @@ conda init
 conda activate slm_env
 pip install torch transformers datasets pandas tqdm tensorboard scikit-learn accelerate
 
-# Note: Save the conda environment path for later
-# It will be something like: /vast/YOUR_NETID/conda_envs/slm_env
-# Update this path in the SLURM scripts (line 22) if different
-```
-
-### Get Your Project ID (Required for Tandon HPC)
-
-NYU Tandon HPC requires a project ID to submit jobs. The format is `pr_XXX`.
-
-**How to get your Project ID:**
-1. **If you're a researcher/student**: Request your Project ID from your PI (Principal Investigator)
-2. **If you're a PI**: Register a project at https://projects.rit.nyu.edu/
-3. **For help**: Email soehelpdesk@nyu.edu
-
-**Check if you already have a project ID:**
-```bash
-# On Greene HPC
-sacctmgr show user $USER
+# Note: The SLURM scripts use `conda activate slm_env` which will work
+# if the environment is in your default conda location
 ```
 
 ### Update SLURM Scripts
@@ -77,37 +61,61 @@ Edit both `scripts/slurm/train_gpt2_grammar.sh` and `scripts/slurm/train_gpt2_re
 
 Replace `YOUR_NETID` with your actual NetID
 Replace `YOUR_EMAIL@nyu.edu` with your NYU email
-Replace `pr_XXX` with your actual project ID (format: pr_XXX)
 
 **Quick replace with your values:**
 ```bash
 # On Greene HPC, after transferring files
-# Set your values (replace with your actual NetID, email, and project ID)
+# Set your values (replace with your actual NetID and email)
 export NETID="YOUR_NETID"  # Replace with your NetID
 export EMAIL="your.email@nyu.edu"  # Replace with your NYU email
-export PROJECT_ID="pr_XXX"  # Replace with your project ID (e.g., pr_123)
 
 cd /scratch/$NETID/SLM_system
 
-# Replace YOUR_NETID, YOUR_EMAIL, and pr_XXX in both SLURM scripts
+# Replace YOUR_NETID and YOUR_EMAIL in both SLURM scripts
 sed -i "s/YOUR_NETID/$NETID/g" scripts/slurm/train_gpt2_grammar.sh
 sed -i "s/YOUR_NETID/$NETID/g" scripts/slurm/train_gpt2_readability.sh
 sed -i "s/YOUR_EMAIL@nyu.edu/$EMAIL/g" scripts/slurm/train_gpt2_grammar.sh
 sed -i "s/YOUR_EMAIL@nyu.edu/$EMAIL/g" scripts/slurm/train_gpt2_readability.sh
-sed -i "s/pr_XXX/$PROJECT_ID/g" scripts/slurm/train_gpt2_grammar.sh
-sed -i "s/pr_XXX/$PROJECT_ID/g" scripts/slurm/train_gpt2_readability.sh
 
 # Verify the changes (should return nothing if successful)
-grep -n "YOUR_NETID\|YOUR_EMAIL\|pr_XXX" scripts/slurm/*.sh
+grep -n "YOUR_NETID\|YOUR_EMAIL" scripts/slurm/*.sh
 ```
 
 **Or one-liner (replace with your actual values):**
 ```bash
-cd /scratch/YOUR_NETID/SLM_system && sed -i 's/YOUR_NETID/YOUR_ACTUAL_NETID/g; s/YOUR_EMAIL@nyu.edu/your.email@nyu.edu/g; s/pr_XXX/pr_YOUR_PROJECT/g' scripts/slurm/*.sh
+cd /scratch/YOUR_NETID/SLM_system && sed -i 's/YOUR_NETID/YOUR_ACTUAL_NETID/g; s/YOUR_EMAIL@nyu.edu/your.email@nyu.edu/g' scripts/slurm/*.sh
 ```
+
+### Storage Locations & Quotas
+
+**Check your storage quotas:**
+```bash
+myquota
+```
+
+**Storage recommendations based on your quotas:**
+
+- **`/scratch` (5.0TB available)** - USE THIS for everything:
+  - Datasets (`hpc_datasets/`)
+  - Models (`models/`) - can be several GB each
+  - Results (`results/`)
+  - Logs (`logs/`)
+  - **All your work should be in `/scratch/al8372/SLM_system/`**
+
+- **`/home` (50GB, but file limit exceeded)** - DO NOT USE:
+  - Your home directory is at file limit (33K files, 110% of 30K limit)
+  - Only use for config files, not data/models
+
+- **`/archive` (2.0TB)** - For long-term storage:
+  - Use this to archive completed models/results if needed
+  - Not for active work
+
+**Note:** Your conda environment is in `/home/al8372/.conda` which is taking up space. Consider using Singularity containers instead (see HPC documentation).
 
 ### Create Directories
 ```bash
+# All directories should be in /scratch
+cd /scratch/al8372/SLM_system
 mkdir -p logs models results
 ```
 
