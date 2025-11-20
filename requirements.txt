@@ -10,3 +10,6 @@ sentencepiece
 protobuf
 errant
 spacy
+openai
+python-dotenv
+nltk
