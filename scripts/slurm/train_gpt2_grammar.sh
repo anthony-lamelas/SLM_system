@@ -18,7 +18,7 @@ module load cuda/11.3.1
 
 # Activate your conda environment
 source ~/.bashrc
-conda activate slm_env
+conda activate /scratch/YOUR_NETID/conda_envs/slm_env
 
 # Change to your working directory on scratch
 cd /scratch/YOUR_NETID/SLM_system
