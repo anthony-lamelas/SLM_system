@@ -127,9 +127,7 @@ def main():
         save_total_limit=3,  # Keep only 3 best checkpoints
         fp16=torch.cuda.is_available(),  # Use mixed precision if GPU available
         report_to='tensorboard',
-        load_best_model_at_end=True,
-        metric_for_best_model='loss',
-        greater_is_better=False,
+        load_best_model_at_end=False,  # We save the final model manually
     )
     
     # Initialize trainer
