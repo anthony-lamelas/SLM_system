@@ -6,9 +6,11 @@ Usage: python evaluate_gpt2.py --model_path ./models/gpt2_bea/final_model --test
 import argparse
 import pandas as pd
 import torch
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
 import json
+from nltk.translate.gleu_score import sentence_gleu
+from nltk.tokenize import word_tokenize
 
 
 def generate_correction(model, tokenizer, input_text, max_length=512, device='cuda'):
@@ -74,11 +76,138 @@ def evaluate_dataset(model, tokenizer, test_data_path, output_path, device='cuda
     return results_df
 
 
+def calculate_gleu(sources, predictions, references):
+    """Calculate GLEU score."""
+    scores = []
+    for src, pred, ref in zip(sources, predictions, references):
+        try:
+            # Tokenize
+            pred_tokens = word_tokenize(pred.lower())
+            ref_tokens = word_tokenize(ref.lower())
+            
+            # Calculate GLEU with reference as a list of lists
+            score = sentence_gleu([ref_tokens], pred_tokens)
+            scores.append(score)
+        except:
+            scores.append(0.0)
+    
+    return sum(scores) / len(scores) if scores else 0.0
+
+
+def calculate_m2_score(sources, predictions, references, results_df):
+    """Calculate M² scores using ERRANT."""
+    try:
+        import errant
+        
+        # Initialize ERRANT annotator
+        annotator = errant.load('en')
+        
+        total_tp = 0  
+        total_fp = 0  
+        total_fn = 0  
+        
+        print("Calculating M^2 scores with ERRANT...")
+        
+        # Prepare all texts for batch processing and filter out invalid entries
+        all_sources = []
+        all_predictions = []
+        all_references = []
+        
+        for src, pred, ref in zip(sources, predictions, references):
+            # Skip entries with NaN or non-string values
+            if isinstance(src, str) and isinstance(pred, str) and isinstance(ref, str):
+                all_sources.append(src)
+                all_predictions.append(pred)
+                all_references.append(ref)
+        
+        print(f"  Processing {len(all_sources)} valid examples (skipped {len(list(sources)) - len(all_sources)} invalid entries)")
+        
+        # Parse all texts in batches (much faster than one-by-one)
+        print("  Parsing sources...")
+        src_docs = list(annotator.nlp.pipe(all_sources, batch_size=32, n_process=1))
+        
+        print("  Parsing predictions...")
+        pred_docs = list(annotator.nlp.pipe(all_predictions, batch_size=32, n_process=1))
+        
+        print("  Parsing references...")
+        ref_docs = list(annotator.nlp.pipe(all_references, batch_size=32, n_process=1))
+        
+        print("  Calculating edit alignments...")
+        
+        # Now process edits with batch-parsed documents
+        for src_doc, pred_doc, ref_doc in tqdm(
+            zip(src_docs, pred_docs, ref_docs), 
+            total=len(src_docs), 
+            desc="M^2 Scoring"
+        ):
+            try:
+                # Annotate source 
+                pred_edits = annotator.annotate(src_doc, pred_doc)
+                
+                # Annotate source 
+                ref_edits = annotator.annotate(src_doc, ref_doc)
+                
+                # Convert edits to sets for comparison
+                pred_set = set([(e.o_start, e.o_end, e.c_str, e.type) for e in pred_edits])
+                ref_set = set([(e.o_start, e.o_end, e.c_str, e.type) for e in ref_edits])
+                
+                # Calculate TP, FP, FN
+                tp = len(pred_set & ref_set)
+                fp = len(pred_set - ref_set)
+                fn = len(ref_set - pred_set)
+                
+                total_tp += tp
+                total_fp += fp
+                total_fn += fn
+                
+            except Exception as e:
+                continue
+        
+        # Calculate precision, recall, and F0.5
+        precision = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0.0
+        recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0.0
+        
+        # F0.5 = (1 + 0.5^2) * (precision * recall) / (0.5^2 * precision + recall)
+        beta = 0.5
+        f_beta = ((1 + beta**2) * precision * recall) / (beta**2 * precision + recall) if (precision + recall) > 0 else 0.0
+        
+        return {
+            'precision': precision * 100,
+            'recall': recall * 100,
+            'f0.5': f_beta * 100
+        }
+    
+    except ImportError:
+        print("\nWarning: ERRANT not available. Skipping M^2 score calculation.")
+        print("Install with: pip install errant")
+        print("Then download spaCy model: python -m spacy download en_core_web_sm")
+        return None
+    except Exception as e:
+        print(f"\nError calculating M^2 scores: {e}")
+        return None
+
+
 def calculate_metrics(results_df):
-    """Calculate basic evaluation metrics."""
+    """Calculate evaluation metrics including GLEU and M² scores."""
     # Exact match accuracy
     exact_matches = sum(results_df['prediction'] == results_df['target_text'])
     exact_match_acc = exact_matches / len(results_df) * 100
+    
+    # Calculate GLEU score
+    print("\nCalculating GLEU scores...")
+    gleu = calculate_gleu(
+        results_df['input_text'].tolist(),
+        results_df['prediction'].tolist(),
+        results_df['target_text'].tolist()
+    )
+    
+    # Calculate M^2 F0.5 score
+    m2_scores = calculate_m2_score(
+        results_df['input_text'].tolist(),
+        results_df['prediction'].tolist(),
+        results_df['target_text'].tolist(),
+        results_df
+    )
     
     print("\n" + "="*50)
     print("EVALUATION METRICS")
@@ -86,14 +215,29 @@ def calculate_metrics(results_df):
     print(f"Total examples: {len(results_df)}")
     print(f"Exact matches: {exact_matches}")
     print(f"Exact match accuracy: {exact_match_acc:.2f}%")
+    print(f"\nGLEU Score: {gleu * 100:.2f}")
+    
+    if m2_scores:
+        print(f"\nM^2 Scores:")
+        print(f"  Precision: {m2_scores['precision']:.2f}%")
+        print(f"  Recall: {m2_scores['recall']:.2f}%")
+        print(f"  F0.5: {m2_scores['f0.5']:.2f}%")
     print("="*50)
     
     # Save metrics
     metrics = {
         'total_examples': len(results_df),
         'exact_matches': int(exact_matches),
-        'exact_match_accuracy': float(exact_match_acc)
+        'exact_match_accuracy': float(exact_match_acc),
+        'gleu_score': float(gleu * 100)
     }
+    
+    if m2_scores:
+        metrics.update({
+            'm2_precision': float(m2_scores['precision']),
+            'm2_recall': float(m2_scores['recall']),
+            'm2_f0.5': float(m2_scores['f0.5'])
+        })
     
     return metrics
 
@@ -120,10 +264,10 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # Load model and tokenizer
+    # Load model and tokenizer (Auto classes work with GPT-2, GPT-Neo, etc.)
     print(f"Loading model from {args.model_path}...")
-    tokenizer = GPT2Tokenizer.from_pretrained(args.model_path)
-    model = GPT2LMHeadModel.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    model = AutoModelForCausalLM.from_pretrained(args.model_path)
     model.to(device)
     model.eval()
     

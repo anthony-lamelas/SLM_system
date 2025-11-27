@@ -10,8 +10,8 @@ import time
 import pandas as pd
 import torch
 from transformers import (
-    GPT2LMHeadModel,
-    GPT2Tokenizer,
+    AutoModelForCausalLM,
+    AutoTokenizer,
     Trainer,
     TrainingArguments,
     DataCollatorForLanguageModeling
@@ -58,18 +58,19 @@ def prepare_dataset(df, tokenizer, max_length=512):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Train GPT-2 on BEA dataset')
+    parser = argparse.ArgumentParser(description='Train GPT-2/GPT-Neo on BEA dataset')
     parser.add_argument('--train_data', type=str, default='hpc_datasets/bea_train.csv',
                         help='Path to training CSV file')
-    parser.add_argument('--model_size', type=str, default='gpt2',
-                        choices=['gpt2', 'gpt2-medium', 'gpt2-large', 'gpt2-xl'],
-                        help='GPT-2 model size')
+    parser.add_argument('--model_name', type=str, default='gpt2',
+                        help='Model name or path (e.g., gpt2, gpt2-medium, gpt2-large, gpt2-xl, EleutherAI/gpt-neo-125M, EleutherAI/gpt-neo-1.3B)')
     parser.add_argument('--output_dir', type=str, default='./models/gpt2_bea',
                         help='Output directory for trained model')
     parser.add_argument('--epochs', type=int, default=3,
                         help='Number of training epochs')
-    parser.add_argument('--batch_size', type=int, default=4,
-                        help='Training batch size')
+    parser.add_argument('--batch_size', type=int, default=8,
+                        help='Training batch size per device (increased for better GPU usage)')
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=4,
+                        help='Gradient accumulation steps (effective batch = batch_size * gradient_accumulation_steps)')
     parser.add_argument('--learning_rate', type=float, default=5e-5,
                         help='Learning rate')
     parser.add_argument('--max_length', type=int, default=512,
@@ -78,6 +79,10 @@ def main():
                         help='Save checkpoint every N steps')
     parser.add_argument('--logging_steps', type=int, default=100,
                         help='Log every N steps')
+    parser.add_argument('--dataloader_num_workers', type=int, default=4,
+                        help='Number of data loading workers (increased for faster data loading)')
+    parser.add_argument('--use_gradient_checkpointing', action='store_true',
+                        help='Use gradient checkpointing to save memory (useful for larger models)')
     
     args = parser.parse_args()
     
@@ -85,10 +90,15 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
-    # Load tokenizer and model
-    print(f"Loading {args.model_size} model and tokenizer...")
-    tokenizer = GPT2Tokenizer.from_pretrained(args.model_size)
-    model = GPT2LMHeadModel.from_pretrained(args.model_size)
+    # Load tokenizer and model (Auto classes work with GPT-2, GPT-Neo, etc.)
+    print(f"Loading {args.model_name} model and tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    model = AutoModelForCausalLM.from_pretrained(args.model_name)
+    
+    # Enable gradient checkpointing if requested (saves memory for larger models)
+    if args.use_gradient_checkpointing:
+        model.gradient_checkpointing_enable()
+        print("Gradient checkpointing enabled (saves memory)")
     
     # Set pad token (GPT-2 doesn't have one by default)
     tokenizer.pad_token = tokenizer.eos_token
@@ -104,12 +114,24 @@ def main():
         mlm=False  # GPT-2 is causal LM, not masked LM
     )
     
+    # Determine precision (bf16 is better than fp16 if available)
+    use_bf16 = False
+    use_fp16 = False
+    if torch.cuda.is_available():
+        # Check if bf16 is supported (A100, H100, etc.)
+        if torch.cuda.is_bf16_supported():
+            use_bf16 = True
+            print("Using bfloat16 precision (faster and more stable)")
+        else:
+            use_fp16 = True
+            print("Using float16 precision")
+    
     # Training arguments
     training_args = TrainingArguments(
         output_dir=args.output_dir,
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
-        gradient_accumulation_steps=4,  # Effective batch size = 4 * 4 = 16
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
         learning_rate=args.learning_rate,
         weight_decay=0.01,
         warmup_steps=500,
@@ -117,9 +139,13 @@ def main():
         logging_steps=args.logging_steps,
         save_steps=args.save_steps,
         save_total_limit=3,  # Keep only 3 best checkpoints
-        fp16=torch.cuda.is_available(),  # Use mixed precision if GPU available
+        fp16=use_fp16,
+        bf16=use_bf16,
+        dataloader_num_workers=args.dataloader_num_workers,
+        dataloader_pin_memory=True,  # Faster data transfer to GPU
         report_to='tensorboard',
         load_best_model_at_end=False,  # We save the final model manually
+        optim='adamw_torch',  # Use PyTorch's AdamW (faster)
     )
     
     # Initialize trainer
@@ -147,7 +173,7 @@ def main():
         "training_duration_seconds": training_duration,
         "training_duration_hours": training_duration / 3600,
         "training_duration_formatted": f"{int(training_duration // 3600)}h {int((training_duration % 3600) // 60)}m {int(training_duration % 60)}s",
-        "model_size": args.model_size,
+        "model_name": args.model_name,
         "epochs": args.epochs,
         "batch_size": args.batch_size,
         "num_examples": len(train_dataset),
