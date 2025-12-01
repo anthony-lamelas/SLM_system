@@ -59,14 +59,22 @@ python scripts/python/gpt-2-readability/train_gpt2_readability.py \
     --batch_size "$BATCH_SIZE" \
     $USE_GRADIENT_CHECKPOINTING
 
-# Evaluate on ASSET validation set
-python scripts/python/gpt-2-readability/evaluate_gpt2_readability.py \
-    --model_path "$OUTPUT_DIR/final_model" \
-    --test_data hpc_datasets/asset_validation.csv \
-    --output_path "results/readability_${MODEL_ID}_asset_validation.csv"
-
-# Evaluate on ASSET test set
-python scripts/python/gpt-2-readability/evaluate_gpt2_readability.py \
-    --model_path "$OUTPUT_DIR/final_model" \
-    --test_data hpc_datasets/asset_test.csv \
-    --output_path "results/readability_${MODEL_ID}_asset_test.csv"
+# Only evaluate if training succeeded
+if [ $? -eq 0 ] && [ -d "$OUTPUT_DIR/final_model" ]; then
+    echo "Training completed successfully. Starting evaluation..."
+    
+    # Evaluate on ASSET validation set
+    python scripts/python/gpt-2-readability/evaluate_gpt2_readability.py \
+        --model_path "$OUTPUT_DIR/final_model" \
+        --test_data hpc_datasets/asset_validation.csv \
+        --output_path "results/readability_${MODEL_ID}_asset_validation.csv"
+    
+    # Evaluate on ASSET test set
+    python scripts/python/gpt-2-readability/evaluate_gpt2_readability.py \
+        --model_path "$OUTPUT_DIR/final_model" \
+        --test_data hpc_datasets/asset_test.csv \
+        --output_path "results/readability_${MODEL_ID}_asset_test.csv"
+else
+    echo "Training failed or model not found. Skipping evaluation."
+    exit 1
+fi

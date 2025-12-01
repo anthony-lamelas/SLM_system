@@ -22,23 +22,27 @@ def generate_correction(model, tokenizer, input_text, max_length=512, device='cu
     
     # Tokenize
     inputs = tokenizer(prompt, return_tensors='pt', truncation=True, max_length=max_length)
+    input_length = inputs['input_ids'].shape[1]  # Get actual input length
     inputs = {k: v.to(device) for k, v in inputs.items()}
     
-    # Generate
+    # Generate with proper stopping and repetition control
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_length=max_length,
+            max_new_tokens=128,  # Limit new tokens, not total length
             num_return_sequences=1,
             temperature=0.7,
             top_p=0.9,
             do_sample=True,
+            repetition_penalty=1.2,  # Penalize repetition
+            no_repeat_ngram_size=3,  # Prevent 3-gram repetition
             pad_token_id=tokenizer.eos_token_id,
             eos_token_id=tokenizer.eos_token_id,
         )
     
-    # Decode
-    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    # Decode only the new tokens (skip the input prompt)
+    generated_tokens = outputs[0][input_length:]
+    generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
     
     # Extract only the corrected part (after "Corrected:")
     if "Corrected:" in generated_text:

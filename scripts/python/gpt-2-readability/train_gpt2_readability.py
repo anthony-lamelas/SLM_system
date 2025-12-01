@@ -26,8 +26,9 @@ def load_wikiauto_data(train_path):
     
     # Format as "Simplify: [input_text] Simplified: [target_text]"
     # This helps GPT-2 learn the simplification task
+    # Match the evaluation prompt format for consistency
     df['text'] = df.apply(
-        lambda x: f"Simplify this text: {x['input_text']}\nSimplified: {x['target_text']}<|endoftext|>",
+        lambda x: f"Simplify this text to make it shorter and easier to read: {x['input_text']}\nSimplified: {x['target_text']}<|endoftext|>",
         axis=1
     )
     

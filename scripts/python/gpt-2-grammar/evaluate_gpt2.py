@@ -4,6 +4,7 @@ Usage: python evaluate_gpt2.py --model_path ./models/gpt2_bea/final_model --test
 """
 
 import argparse
+import os
 import pandas as pd
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -20,23 +21,27 @@ def generate_correction(model, tokenizer, input_text, max_length=512, device='cu
     
     # Tokenize
     inputs = tokenizer(prompt, return_tensors='pt', truncation=True, max_length=max_length)
+    input_length = inputs['input_ids'].shape[1]  # Get actual input length
     inputs = {k: v.to(device) for k, v in inputs.items()}
     
-    # Generate
+    # Generate with proper stopping and repetition control
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_length=max_length,
+            max_new_tokens=128,  # Limit new tokens, not total length
             num_return_sequences=1,
             temperature=0.7,
             top_p=0.9,
             do_sample=True,
+            repetition_penalty=1.2,  # Penalize repetition
+            no_repeat_ngram_size=3,  # Prevent 3-gram repetition
             pad_token_id=tokenizer.eos_token_id,
             eos_token_id=tokenizer.eos_token_id,
         )
     
-    # Decode
-    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    # Decode only the new tokens (skip the input prompt)
+    generated_tokens = outputs[0][input_length:]
+    generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
     
     # Extract only the corrected part (after "Corrected:")
     if "Corrected:" in generated_text:
@@ -47,26 +52,76 @@ def generate_correction(model, tokenizer, input_text, max_length=512, device='cu
     return correction
 
 
-def evaluate_dataset(model, tokenizer, test_data_path, output_path, device='cuda'):
-    """Evaluate model on entire dataset."""
+def evaluate_dataset(model, tokenizer, test_data_path, output_path, device='cuda', batch_size=8):
+    """Evaluate model on entire dataset with batch processing."""
     print(f"Loading test data from {test_data_path}...")
     df = pd.read_csv(test_data_path)
     
-    print(f"Evaluating on {len(df)} examples...")
+    print(f"Evaluating on {len(df)} examples with batch size {batch_size}...")
     predictions = []
     
-    for idx, row in tqdm(df.iterrows(), total=len(df)):
-        input_text = row['input_text']
-        target_text = row['target_text']
+    # Process in batches for faster evaluation
+    for i in tqdm(range(0, len(df), batch_size), desc="Processing batches"):
+        batch_df = df.iloc[i:i+batch_size]
+        batch_inputs = []
+        batch_input_lengths = []
         
-        # Generate prediction
-        prediction = generate_correction(model, tokenizer, input_text, device=device)
+        # Prepare batch prompts
+        for idx, row in batch_df.iterrows():
+            input_text = row['input_text']
+            prompt = f"Correct this text: {input_text}\nCorrected:"
+            inputs = tokenizer(prompt, return_tensors='pt', truncation=True, max_length=512, padding=False)
+            batch_inputs.append(inputs['input_ids'].squeeze(0))
+            batch_input_lengths.append(inputs['input_ids'].shape[1])
         
-        predictions.append({
-            'input_text': input_text,
-            'target_text': target_text,
-            'prediction': prediction
-        })
+        # Pad batch to same length (left padding for decoder-only models)
+        max_len = max(len(ids) for ids in batch_inputs)
+        padded_inputs = []
+        attention_masks = []
+        for ids in batch_inputs:
+            padding_length = max_len - len(ids)
+            # Left padding: pad tokens go before the actual input
+            padded = torch.cat([torch.full((padding_length,), tokenizer.pad_token_id, dtype=ids.dtype), ids])
+            padded_inputs.append(padded)
+            attention_masks.append(torch.cat([torch.zeros(padding_length, dtype=torch.bool), torch.ones(len(ids), dtype=torch.bool)]))
+        
+        batch_input_ids = torch.stack(padded_inputs).to(device)
+        batch_attention_mask = torch.stack(attention_masks).to(device)
+        
+        # Generate for batch (use greedy decoding for speed)
+        with torch.no_grad():
+            outputs = model.generate(
+                batch_input_ids,
+                attention_mask=batch_attention_mask,
+                max_new_tokens=128,  # Fixed reasonable limit
+                num_return_sequences=1,
+                do_sample=False,  # Greedy decoding is faster
+                repetition_penalty=1.2,
+                no_repeat_ngram_size=3,
+                pad_token_id=tokenizer.eos_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+            )
+        
+        # Decode batch results
+        for j, (output, input_len) in enumerate(zip(outputs, batch_input_lengths)):
+            # With left padding, output starts with padding, then input, then generated
+            # Skip padding and input to get only generated tokens
+            padding_len = max_len - input_len
+            generated_tokens = output[padding_len + input_len:]
+            generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+            
+            # Extract corrected part
+            if "Corrected:" in generated_text:
+                correction = generated_text.split("Corrected:")[-1].strip()
+            else:
+                correction = generated_text.strip()
+            
+            row = batch_df.iloc[j]
+            predictions.append({
+                'input_text': row['input_text'],
+                'target_text': row['target_text'],
+                'prediction': correction
+            })
     
     # Save results
     results_df = pd.DataFrame(predictions)
@@ -252,6 +307,8 @@ def main():
                         help='Path to save predictions CSV (default: auto-generated)')
     parser.add_argument('--max_length', type=int, default=512,
                         help='Maximum sequence length')
+    parser.add_argument('--batch_size', type=int, default=8,
+                        help='Batch size for evaluation (larger = faster but more memory)')
     
     args = parser.parse_args()
     
@@ -264,15 +321,20 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Using device: {device}")
     
+    # Check if model path exists
+    if not os.path.exists(args.model_path):
+        raise FileNotFoundError(f"Model path does not exist: {args.model_path}")
+    
     # Load model and tokenizer (Auto classes work with GPT-2, GPT-Neo, etc.)
     print(f"Loading model from {args.model_path}...")
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
-    model = AutoModelForCausalLM.from_pretrained(args.model_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path, local_files_only=True)
+    model = AutoModelForCausalLM.from_pretrained(args.model_path, local_files_only=True)
     model.to(device)
     model.eval()
     
-    # Set pad token
+    # Set pad token and padding side (left for decoder-only models)
     tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = 'left'  # Important for decoder-only models
     
     # Evaluate
     results_df = evaluate_dataset(
@@ -280,7 +342,8 @@ def main():
         tokenizer, 
         args.test_data, 
         args.output_path,
-        device=device
+        device=device,
+        batch_size=args.batch_size
     )
     
     # Calculate metrics

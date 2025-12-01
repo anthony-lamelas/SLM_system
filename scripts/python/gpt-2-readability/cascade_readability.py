@@ -23,34 +23,56 @@ except LookupError:
 
 def generate_simplification(model, tokenizer, input_text, max_length=512, device='cuda'):
     """Generate simplified text for a single input."""
-    # Format prompt
-    prompt = f"Simplify this text: {input_text}\nSimplified:"
+    # Format prompt with explicit instruction about length
+    prompt = f"Simplify this text to make it shorter and easier to read: {input_text}\nSimplified:"
     
     # Tokenize
     inputs = tokenizer(prompt, return_tensors='pt', truncation=True, max_length=max_length)
+    input_length = inputs['input_ids'].shape[1]  # Get actual input length
     inputs = {k: v.to(device) for k, v in inputs.items()}
     
-    # Generate
+    # Estimate target length (simplified text should be shorter)
+    input_word_count = len(input_text.split())
+    # Set max_new_tokens based on input length, but cap at reasonable limit
+    # For simplification, we want roughly 60-80% of input length
+    estimated_target_tokens = min(int(input_word_count * 0.8 * 1.3), 60)  # 1.3 tokens per word, cap at 60
+    
+    # Generate with proper stopping and repetition control
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_length=max_length,
+            max_new_tokens=estimated_target_tokens,  # Adaptive based on input length
             num_return_sequences=1,
             temperature=0.7,
             top_p=0.9,
             do_sample=True,
+            repetition_penalty=1.3,  # Higher penalty for simplification (stronger)
+            no_repeat_ngram_size=3,  # Prevent 3-gram repetition
             pad_token_id=tokenizer.eos_token_id,
             eos_token_id=tokenizer.eos_token_id,
         )
     
-    # Decode
-    generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    # Decode only the new tokens (skip the input prompt)
+    generated_tokens = outputs[0][input_length:]
+    generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
     
     # Extract only the simplified part (after "Simplified:")
     if "Simplified:" in generated_text:
         simplification = generated_text.split("Simplified:")[-1].strip()
     else:
         simplification = generated_text.strip()
+    
+    # Additional safety: if output is way too long, truncate at first sentence or reasonable length
+    # This handles cases where model ignores EOS token
+    if len(simplification.split()) > input_word_count * 1.5:  # More than 50% longer than input
+        # Try to find first sentence boundary
+        sentences = simplification.split('. ')
+        if len(sentences) > 0:
+            simplification = sentences[0] + '.' if not sentences[0].endswith('.') else sentences[0]
+        else:
+            # Fallback: truncate to reasonable length
+            words = simplification.split()
+            simplification = ' '.join(words[:int(input_word_count * 1.2)])
     
     return simplification
 

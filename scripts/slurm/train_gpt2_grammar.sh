@@ -57,14 +57,22 @@ python scripts/python/gpt-2-grammar/train_gpt2.py \
     --batch_size "$BATCH_SIZE" \
     $USE_GRADIENT_CHECKPOINTING
 
-# Evaluate on BEA dev set
-python scripts/python/gpt-2-grammar/evaluate_gpt2.py \
-    --model_path "$OUTPUT_DIR/final_model" \
-    --test_data hpc_datasets/bea_dev.csv \
-    --output_path "results/grammar_${MODEL_ID}_bea_dev.csv"
-
-# Evaluate on JFLEG test set
-python scripts/python/gpt-2-grammar/evaluate_gpt2.py \
-    --model_path "$OUTPUT_DIR/final_model" \
-    --test_data hpc_datasets/jfleg_test.csv \
-    --output_path "results/grammar_${MODEL_ID}_jfleg_test.csv"
+# Only evaluate if training succeeded
+if [ $? -eq 0 ] && [ -d "$OUTPUT_DIR/final_model" ]; then
+    echo "Training completed successfully. Starting evaluation..."
+    
+    # Evaluate on BEA dev set
+    python scripts/python/gpt-2-grammar/evaluate_gpt2.py \
+        --model_path "$OUTPUT_DIR/final_model" \
+        --test_data hpc_datasets/bea_dev.csv \
+        --output_path "results/grammar_${MODEL_ID}_bea_dev.csv"
+    
+    # Evaluate on JFLEG test set
+    python scripts/python/gpt-2-grammar/evaluate_gpt2.py \
+        --model_path "$OUTPUT_DIR/final_model" \
+        --test_data hpc_datasets/jfleg_test.csv \
+        --output_path "results/grammar_${MODEL_ID}_jfleg_test.csv"
+else
+    echo "Training failed or model not found. Skipping evaluation."
+    exit 1
+fi
