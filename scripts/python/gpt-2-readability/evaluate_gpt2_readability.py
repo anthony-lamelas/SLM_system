@@ -22,7 +22,7 @@ except LookupError:
 
 def generate_simplification(model, tokenizer, input_text, max_length=512, device='cuda'):
     """Generate simplified text for a single input."""
-    # Format prompt with explicit instruction about length
+    # Format prompt - MUST match training prompt exactly
     prompt = f"Simplify this text to make it shorter and easier to read: {input_text}\nSimplified:"
     
     # Tokenize
@@ -133,6 +133,14 @@ def evaluate_dataset(model, tokenizer, test_data_path, output_path, device='cuda
             padding_len = max_len - input_len
             generated_tokens = output[padding_len + input_len:]
             generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+            
+            # DEBUG: Print first example to see what model is generating
+            if i == 0 and j == 0:
+                row = batch_df.iloc[j]
+                print(f"\nDEBUG - First example:")
+                print(f"  Input: {row['input_text'][:100]}...")
+                print(f"  Full generated text: {generated_text[:200]}...")
+                print(f"  Generated tokens length: {len(generated_tokens)}")
             
             # Extract simplified part
             if "Simplified:" in generated_text:

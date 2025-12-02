@@ -16,7 +16,7 @@ from nltk.tokenize import word_tokenize
 
 def generate_correction(model, tokenizer, input_text, max_length=512, device='cuda'):
     """Generate correction for a single input text."""
-    # Format prompt
+    # Format prompt - MUST match training prompt exactly
     prompt = f"Correct this text: {input_text}\nCorrected:"
     
     # Tokenize
@@ -109,6 +109,14 @@ def evaluate_dataset(model, tokenizer, test_data_path, output_path, device='cuda
             padding_len = max_len - input_len
             generated_tokens = output[padding_len + input_len:]
             generated_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+            
+            # DEBUG: Print first example to see what model is generating
+            if i == 0 and j == 0:
+                row = batch_df.iloc[j]
+                print(f"\nDEBUG - First example:")
+                print(f"  Input: {row['input_text'][:100]}...")
+                print(f"  Full generated text: {generated_text[:200]}...")
+                print(f"  Generated tokens length: {len(generated_tokens)}")
             
             # Extract corrected part
             if "Corrected:" in generated_text:
