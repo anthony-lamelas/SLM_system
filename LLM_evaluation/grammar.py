@@ -4,6 +4,14 @@ import json
 from tqdm import tqdm
 from pathlib import Path
 from nltk.translate.gleu_score import sentence_gleu
+import nltk
+
+# Download required NLTK data
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    print("Downloading punkt_tab tokenizer...")
+    nltk.download('punkt_tab', quiet=True)
 
 from client import get_openai_client, generate_completion
 from prompts import grammar_sys_prompt, grammar_gen_prompt

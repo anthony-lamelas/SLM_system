@@ -1,0 +1,15 @@
+{
+  "total_examples": 359,
+  "exact_matches": 1,
+  "exact_match_accuracy": 0.2785515320334262,
+  "avg_input_length": 19.704735376044567,
+  "avg_prediction_length": 20.501392757660167,
+  "avg_target_length": 16.54317548746518,
+  "prediction_compression_rate": -4.042974271981903,
+  "target_compression_rate": 16.044670624823297,
+  "sari_score": 57.44419353502542,
+  "prediction_flesch_reading_ease": 63.57142982569526,
+  "target_flesch_reading_ease": 59.448665435595444,
+  "prediction_flesch_kincaid_grade_level": 8.23477527835584,
+  "target_flesch_kincaid_grade_level": 8.31890193784495
+}

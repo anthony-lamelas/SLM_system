@@ -13,6 +13,11 @@ try:
 except LookupError:
     nltk.download('punkt', quiet=True)
 
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    nltk.download('punkt_tab', quiet=True)
+
 def evaluate_readability(
     model_name,
     test_data_path,
