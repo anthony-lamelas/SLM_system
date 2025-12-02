@@ -24,6 +24,7 @@ build/
 # Datasets
 hpc_datasets/
 data/
+wi+locness_v2.1.bea19/
 *.csv
 *.m2
 
