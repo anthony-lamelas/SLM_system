@@ -3,13 +3,13 @@
   "exact_matches": 0,
   "exact_match_accuracy": 0.0,
   "avg_input_length": 19.704735376044567,
-  "avg_prediction_length": 94.29526462395543,
+  "avg_prediction_length": 25.2033426183844,
   "avg_target_length": 16.54317548746518,
-  "prediction_compression_rate": -378.5411365564038,
+  "prediction_compression_rate": -27.905004240882114,
   "target_compression_rate": 16.044670624823297,
   "sari_score": 0.0,
-  "prediction_flesch_reading_ease": 59.64971443153686,
+  "prediction_flesch_reading_ease": 58.47600360532278,
   "target_flesch_reading_ease": 59.448665435595444,
-  "prediction_flesch_kincaid_grade_level": 8.454642843300784,
+  "prediction_flesch_kincaid_grade_level": 8.967674969778527,
   "target_flesch_kincaid_grade_level": 8.31890193784495
 }

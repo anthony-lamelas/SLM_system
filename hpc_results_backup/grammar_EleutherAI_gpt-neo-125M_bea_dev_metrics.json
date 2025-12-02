@@ -1,9 +1,9 @@
 {
   "total_examples": 8768,
-  "exact_matches": 4,
-  "exact_match_accuracy": 0.04562043795620438,
+  "exact_matches": 0,
+  "exact_match_accuracy": 0.0,
   "gleu_score": 0.0,
-  "m2_precision": 8.172157279489904,
-  "m2_recall": 20.56974722482279,
-  "m2_f0.5": 9.29226530686226
+  "m2_precision": 3.401635852432478,
+  "m2_recall": 21.358833756854352,
+  "m2_f0.5": 4.089230753473413
 }
