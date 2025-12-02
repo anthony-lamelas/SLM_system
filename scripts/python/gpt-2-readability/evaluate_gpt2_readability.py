@@ -14,10 +14,16 @@ import textstat
 import nltk
 from nltk.tokenize import word_tokenize
 
+# Download required NLTK data
 try:
     nltk.data.find('tokenizers/punkt')
 except LookupError:
     nltk.download('punkt', quiet=True)
+
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    nltk.download('punkt_tab', quiet=True)
 
 
 def generate_simplification(model, tokenizer, input_text, max_length=512, device='cuda'):

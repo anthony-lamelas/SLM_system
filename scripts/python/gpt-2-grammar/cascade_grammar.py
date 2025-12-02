@@ -11,8 +11,20 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
 import json
 import os
+import nltk
 from nltk.translate.gleu_score import sentence_gleu
 from nltk.tokenize import word_tokenize
+
+# Download required NLTK data
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt', quiet=True)
+
+try:
+    nltk.data.find('tokenizers/punkt_tab')
+except LookupError:
+    nltk.download('punkt_tab', quiet=True)
 
 
 def generate_correction(model, tokenizer, input_text, max_length=512, device='cuda'):
