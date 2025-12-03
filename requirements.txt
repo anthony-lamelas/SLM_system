@@ -13,3 +13,6 @@ spacy
 openai
 python-dotenv
 nltk
+matplotlib
+numpy
+seaborn
