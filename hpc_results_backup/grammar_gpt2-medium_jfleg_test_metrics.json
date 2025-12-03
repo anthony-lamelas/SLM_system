@@ -2,7 +2,7 @@
   "total_examples": 748,
   "exact_matches": 0,
   "exact_match_accuracy": 0.0,
-  "gleu_score": 0.0,
+  "gleu_score": 3.85,
   "m2_precision": 3.4804928131416837,
   "m2_recall": 15.161001788908765,
   "m2_f0.5": 4.114477133702301

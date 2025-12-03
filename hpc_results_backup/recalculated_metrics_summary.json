@@ -1,0 +1,44 @@
+[
+  {
+    "file": "grammar_EleutherAI_gpt-neo-125M_jfleg_test.csv",
+    "num_examples": 748,
+    "average_gleu": 5.33,
+    "average_sari": 27.46,
+    "task_type": "grammar"
+  },
+  {
+    "file": "grammar_gpt2-medium_jfleg_test.csv",
+    "num_examples": 748,
+    "average_gleu": 3.85,
+    "average_sari": 24.77,
+    "task_type": "grammar"
+  },
+  {
+    "file": "grammar_gpt2_jfleg_test.csv",
+    "num_examples": 748,
+    "average_gleu": 4.66,
+    "average_sari": 25.85,
+    "task_type": "grammar"
+  },
+  {
+    "file": "readability_EleutherAI_gpt-neo-125M_asset_test.csv",
+    "num_examples": 359,
+    "average_gleu": 3.12,
+    "average_sari": 33.91,
+    "task_type": "readability"
+  },
+  {
+    "file": "readability_gpt2_asset_test.csv",
+    "num_examples": 359,
+    "average_gleu": 3.05,
+    "average_sari": 35.27,
+    "task_type": "readability"
+  },
+  {
+    "file": "test_debug_readability_gpt2.csv",
+    "num_examples": 359,
+    "average_gleu": 3.05,
+    "average_sari": 35.26,
+    "task_type": "readability"
+  }
+]
