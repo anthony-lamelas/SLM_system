@@ -7,6 +7,9 @@ Quick guide to deploy and run SLM experiments on NYU Greene.
 ```bash
 # Remove the old host key (as suggested in the error message)
 ssh-keygen -f '/home/dell/.ssh/known_hosts' -R 'greene.hpc.nyu.edu'
+
+# if on hpc
+ssh-keygen -f ~/.ssh/known_hosts -R 'greene.hpc.nyu.edu'
 ```
 
 ## 1. Initial Setup (One-time)
